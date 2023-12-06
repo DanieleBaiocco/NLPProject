@@ -1,32 +1,14 @@
 import pandas as pd
 import numpy as np
 import torch
-import pickle
 import nlp_utils as nu
 from torch.utils import data
 
-pickle_path = "../Pickles/"
 our_training_path = "../Data/meld-fr_partial_train.csv"
 our_testing_path = "../Data/meld-fr_partial_test.csv"
-save_path = pickle_path
 
 our_training_csv = pd.read_csv(our_training_path)
 our_testing_csv = pd.read_csv(our_testing_path)
-
-with open(pickle_path+"idx2utt.pickle","rb") as f:
-    idx2utt = pickle.load(f)
-with open(pickle_path+"utt2idx.pickle","rb") as f:
-    utt2idx = pickle.load(f)
-    
-with open(pickle_path+"idx2emo.pickle","rb") as f:
-    idx2emo = pickle.load(f)
-with open(pickle_path+"emo2idx.pickle","rb") as f:
-    emo2idx = pickle.load(f)
-    
-with open(pickle_path+"idx2speaker.pickle","rb") as f:
-    idx2speaker = pickle.load(f)
-with open(pickle_path+"speaker2idx.pickle","rb") as f:
-    speaker2idx = pickle.load(f)
 
 batch_size = 8
 seq_len = 5
@@ -250,42 +232,3 @@ E = torch.LongTensor(X_test_emo)
 Y = torch.LongTensor(y_test_flip)
 
 my_dataset_test = data.TensorDataset(D,X,E,Y)
-
-##################
-### Saving everything
-with open(save_path+"train_data_trig.pickle","wb") as f:
-    pickle.dump(my_dataset_train,f)
-
-with open(save_path+"test_data_trig.pickle","wb") as f:
-    pickle.dump(my_dataset_test,f)
-        
-with open(save_path+"global_speaker_info_trig.pickle","wb") as f:
-    pickle.dump(global_speaker_info,f)
-    
-with open(save_path+"speaker_dialogues_trig.pickle","wb") as f:
-    pickle.dump(speaker_dialogues,f)
-    
-with open(save_path+"speaker_emotions_trig.pickle","wb") as f:
-    pickle.dump(speaker_emotions,f)
-    
-with open(save_path+"speaker_indices_trig.pickle","wb") as f:
-    pickle.dump(speaker_indices,f)
-    
-with open(save_path+"utt_len_trig.pickle","wb") as f:
-    pickle.dump(utt_len,f)
-    
-    
-with open(save_path+"global_speaker_info_test_trig.pickle","wb") as f:
-    pickle.dump(global_speaker_info_test,f)
-    
-with open(save_path+"speaker_dialogues_test_trig.pickle","wb") as f:
-    pickle.dump(speaker_dialogues_test,f)
-    
-with open(save_path+"speaker_emotions_test_trig.pickle","wb") as f:
-    pickle.dump(speaker_emotions_test,f)
-    
-with open(save_path+"speaker_indices_test_trig.pickle","wb") as f:
-    pickle.dump(speaker_indices_test,f)
-    
-with open(save_path+"utt_len_test_trig.pickle","wb") as f:
-    pickle.dump(utt_len_test,f)

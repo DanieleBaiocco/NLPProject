@@ -1,14 +1,12 @@
 import pandas as pd
 import numpy as np
 import torch
-import pickle
 import tqdm
 import nlp_utils as nu
 from torch.utils import data
 
 our_training_path = "../Data/meld-fr_partial_train.csv"
 our_testing_path = "../Data/meld-fr_partial_test.csv"
-save_path = "../Pickles/"
 
 our_training_csv = pd.read_csv(our_training_path)
 our_testing_csv = pd.read_csv(our_testing_path)
@@ -18,18 +16,19 @@ our_testing_csv = pd.read_csv(our_testing_path)
 ### Making utt2idx, emo2idx, speaker2idx, etc dicts
 our_utterances = our_training_csv["Utterance"]
 our_utterances_test = our_testing_csv["Utterance"]
+all_utterances = pd.concat([our_utterances, our_utterances_test])
 
-all_utterances = our_training_csv["Utterance"]
-all_utterances = all_utterances.append(our_testing_csv["Utterance"])
+our_emotions = our_training_csv["Emotion_name"]
+our_emotions_test = our_testing_csv["Emotion_name"]
+all_emotions = pd.concat([our_emotions, our_emotions_test])
 
-all_emotions = our_training_csv["Emotion_name"]
-all_emotions = all_emotions.append(our_testing_csv["Emotion_name"])
+our_speakers = our_training_csv["Speaker"]
+our_speakers_test = our_testing_csv["Speaker"]
+all_speakers = pd.concat([our_speakers, our_speakers_test])
 
-all_speakers = our_training_csv["Speaker"]
-all_speakers = all_speakers.append(our_testing_csv["Speaker"])
-
-all_annotations = our_training_csv["Annotate(0/1)"]
-all_annotations = all_annotations.append(our_testing_csv["Annotate(0/1)"])
+our_annotations = our_training_csv["Annotate(0/1)"]
+our_annotations_test = our_testing_csv["Annotate(0/1)"]
+all_annotations = pd.concat([our_annotations, our_annotations_test])
 
 f_utterances = ["<pad>"]
 f_emotions = []
@@ -76,9 +75,6 @@ for speak in speaks:
   ctr += 1
 
 ##################
-### Making weight matrix
-with open('../Pickles/sent2emb.pickle','rb') as f:
-    sent2emb = pickle.load(f)
 
 batch_size = 8
 seq_len = 15
@@ -86,16 +82,6 @@ seq2_len = seq_len
 emb_size = 768
 hidden_size = 768
 batch_first = True
-
-matrix_len = len(idx2utt)+1
-weight_matrix = np.zeros((matrix_len, hidden_size))
-
-for utt in idx2utt.values():
-    pp_utt = nu.preprocess_text(utt)
-    if pp_utt != "pad":
-      weight_matrix[utt2idx[pp_utt]] = sent2emb[pp_utt].cpu()
-
-weight_matrix = torch.Tensor(weight_matrix)
 
 ##################
 ### Reading training data
@@ -484,50 +470,3 @@ for d,dialogue,emo,trig,n_nn in zip(X_test_d_id,X_test,y_test_emo,y_test_flip,y_
     y_flip.append(trig)
     y_emo_lvl1.append(n_nn)
     d_id += 1
-
-##################
-### Saving everything
-with open(save_path+"idx2utt.pickle","wb") as f:
-    pickle.dump(idx2utt,f)
-    
-with open(save_path+"utt2idx.pickle","wb") as f:
-    pickle.dump(utt2idx,f)
-    
-with open(save_path+"idx2emo.pickle","wb") as f:
-    pickle.dump(idx2emo,f)
-    
-with open(save_path+"emo2idx.pickle","wb") as f:
-    pickle.dump(emo2idx,f)
-    
-with open(save_path+"idx2speaker.pickle","wb") as f:
-    pickle.dump(idx2speaker,f)
-    
-with open(save_path+"speaker2idx.pickle","wb") as f:
-    pickle.dump(speaker2idx,f)
-    
-
-with open(save_path+"weight_matrix.pickle","wb") as f:
-    pickle.dump(weight_matrix,f)
-    
-    
-with open(save_path+"test_data.pickle","wb") as f:
-    pickle.dump(my_dataset_test,f)
-
-with open(save_path+"train_data.pickle","wb") as f:
-    pickle.dump(my_dataset_train,f)
-    
-    
-with open(save_path+"final_speaker_info.pickle","wb") as f:
-    pickle.dump(final_speaker_info,f)
-    
-with open(save_path+"final_speaker_dialogues.pickle","wb") as f:
-    pickle.dump(final_speaker_dialogues,f)
-    
-with open(save_path+"final_speaker_emotions.pickle","wb") as f:
-    pickle.dump(final_speaker_emotions,f)
-    
-with open(save_path+"final_speaker_indices.pickle","wb") as f:
-    pickle.dump(final_speaker_indices,f)
-    
-with open(save_path+"final_utt_len.pickle","wb") as f:
-    pickle.dump(final_utt_len,f)

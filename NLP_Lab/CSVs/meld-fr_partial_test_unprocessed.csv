@@ -1,4 +1,4 @@
-Dialogue_Id,speakers,emotions,utterances,triggers
+Dialogue_Id,Speaker,Emotion_name,Utterance,Annotate(0/1)
 555,"['Phoebe', 'Phoebe']","['sadness', 'anger']","['Look, I feel really bad about how I freaked you out before, so I called the father and asked him to meet you here so you can tell him.', 'Go!']","[0.0, 0.0]"
 3491,"['Phoebe', 'Eric', 'Phoebe', 'Eric']","['surprise', 'fear', 'surprise', 'sadness']","['You-you\x85you had sex with Ursula?!', 'Uh, a little bit. She-she-she walked in and I thought she was you and I kissed her and', ""You didn't notice she was wearing different clothes?!"", 'Well I was just so excited to see you.']","[0.0, 0.0, 1.0, 0.0]"
 527,"['Mona', 'Ross', 'Dr. Green', 'Ross']","['fear', 'neutral', 'anger', 'sadness']","[""Oh my God! Oh my God! I'm so sorry!"", ""Aw forget it, it's from"", ""You think you can knock up my daughter and then not marry her?! I'm gonna kill you!!"", ""Y'know this is actually not a great time for me.""]","[0.0, 0.0, 1.0, 0.0]"
