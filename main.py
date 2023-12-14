@@ -3,7 +3,7 @@
 # ===========================================
 
 import torch
-from tqdm import tqdm
+
 import numpy as np
 import os
 import pandas as pd
@@ -11,6 +11,12 @@ from sklearn.model_selection import train_test_split
 import random
 from torch.utils.data import Dataset, DataLoader
 from transformers import BertTokenizer, BertForSequenceClassification
+from torch.optim import Adam
+from functools import cache
+import time
+import argparse
+import glob
+import logging
 
 # Hyper-parameters
 EPOCHS = 10
@@ -49,8 +55,8 @@ def create_dataframes(orginal_df, seed):
     validation, test = train_test_split(test_validation, test_size=0.5, random_state=seed)
     return train, validation, test
 
-def set_default_seed():
-    _seed = SEEDS[0]
+def set_default_seed(_seed):
+    #_seed = SEEDS[0]
 
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(_seed)
@@ -68,12 +74,37 @@ def set_device():
 def prepare_data():
     pass
 
+@cache
+def predefined_model():
+    tokenizer = BertTokenizer.from_pretrained('distilbert-base-uncased', truncation=True, do_lower_case=True)
+    pretrained_model = BertForSequenceClassification.from_pretrained('distilbert-base-uncased')
+    return tokenizer, pretrained_model
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--do_train", action="store_true", help="Whether to run training.")
+    parser.add_argument("--do_eval", action="store_true", help="Whether to run eval on the dev set.")
+    parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
+    args = parser.parse_args()
+
+    seed = args.seed
+    set_default_seed(seed)
+    device = set_device()
+    print("do train: ", args.do_train)
     _df = readData()
+
+
+    # if args.do_train:
+    #     TOKENIZER, MODEL = predefined_model()
+        
+    #     optimizer = Adam(MODEL.parameters(), lr=LEARNING_RATE)
+
+    # elif args.do_eval:
+    #     # Load
+
+
+
     
-    seed = set_default_seed()
-    set_device()
 
     df_train, df_validation, df_test = create_dataframes(_df, seed)
 
