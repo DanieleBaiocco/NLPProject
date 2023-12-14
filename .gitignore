@@ -1,4 +1,5 @@
 .menv/
+__pycache__/
 
 activate_run.sh
 run.sh
