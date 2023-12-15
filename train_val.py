@@ -28,7 +28,9 @@ class EFRTraining():
 
         loop = tqdm(enumerate(self.training_loader, 0), total=len(self.training_loader))
         for _,data in loop:
-            inputs = data['utterances_tokenized'].to(self.device, dtype = torch.long)
+            print("9999999999999999999999999999999999999999999999")
+            inputs = data['utterances']
+            print("000000000000000000000000000000000000000000000000")
             triggers = data['triggers'].to(self.device, dtype = torch.long)
             
             outputs = self.model(inputs, labels=triggers)
