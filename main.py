@@ -23,6 +23,7 @@ import argparse
 import glob
 import logging
 from train_val import EFRTraining
+from sklearn.preprocessing import MultiLabelBinarizer
 
 # Hyper-parameters
 EPOCHS = 1
@@ -42,6 +43,9 @@ TEST_PARAMS = {'batch_size': VALID_BATCH_SIZE,
                 'shuffle': True,
                 'num_workers': 0
                 }
+
+
+
 
 class EFRDataset(Dataset):
     def __init__(self, dataframe, tokenizer, max_len):
@@ -75,10 +79,12 @@ class EFRDataset(Dataset):
 def readData(): 
     return pd.read_json('data/MELD_train_efr.json')
 
+
 def create_dataframes(orginal_df, seed):
     train, test_validation = train_test_split(orginal_df, test_size=0.2, random_state=seed)
     validation, test = train_test_split(test_validation, test_size=0.5, random_state=seed)
     return train, validation, test
+
 
 def set_default_seed(_seed):
     #_seed = SEEDS[0]
@@ -91,18 +97,43 @@ def set_default_seed(_seed):
 
     return _seed
 
+
 def set_device():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print("Using device => ", device)
 
-def prepare_data():
-    pass
+
+def prepare_data(df):
+    # Emotions One-hot Labeling
+    df = one_hot_encoder(df, 'emotions', 'emotions_ids')
+    # Speakers One-hot Labeling
+    df = one_hot_encoder(df, 'speakers', 'speakers_ids')
+
+    return df
+
+
+def one_hot_encoder(df, column_name, new_column_name):
+    mlb = MultiLabelBinarizer()
+    binary_encoded = mlb.fit_transform(df[column_name])
+
+    class_to_decimal = {label: i for i, label in enumerate(mlb.classes_)}
+    df[new_column_name] = df[column_name].apply(lambda x: [class_to_decimal[label] for label in x])
+
+    # Find the minum bits for classifying
+    max_decimal = max(max(x) for x in df[new_column_name])
+    min_bits = max(1, (max_decimal.bit_length() + 7) // 8) * 8
+    print(f"At most {min_bits} bits needed for labeling {column_name}")
+
+    df[new_column_name] = df[new_column_name].apply(lambda x: [format(decimal, f'0{min_bits}b') for decimal in x])
+    return df
+
 
 @cache
 def predefined_model():
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', truncation=True, do_lower_case=True)
     pretrained_model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
     return tokenizer, pretrained_model
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -126,14 +157,17 @@ def main():
 
     # Inspecting Data
     _df = readData()
-    for id,row in  _df.iterrows():
-         if id == 1227:
-            print(row['utterances'])
-    #     print(len(row['utterances']))
+    
     max_n_dialogs = max(_df['utterances'].apply(lambda x: len(x)))
     max_n_speakers = max(_df['speakers'].apply(lambda x: len(x)))
-    print(f"Maximum Number of Dialogs: {max_n_dialogs}")
+    max_n_triggers = max(_df['triggers'].apply(lambda x: len(x)))
+    max_n_emotions = max(_df['emotions'].apply(lambda x: len(x)))
+    print(f"\nMaximum Number of Dialogs: {max_n_dialogs}")
     print(f"Maximum Number of Speakers: {max_n_speakers}")
+    print(f"Maximum Number of Triggers: {max_n_triggers}")
+    print(f"Maximum Number of Emotions: {max_n_emotions}\n")
+
+    _df = prepare_data(_df)
 
     # Setup Datasets
     df_train, df_validation, df_test = create_dataframes(_df, seed)
