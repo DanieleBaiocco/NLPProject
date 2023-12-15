@@ -1,5 +1,6 @@
 .menv/
 __pycache__/
+dataframes/
 
 activate_run.sh
 run.sh

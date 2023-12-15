@@ -8,21 +8,25 @@
 # try to find out best way for managing classes
 
 import torch
-
 import numpy as np
 import os
 import pandas as pd
 from sklearn.model_selection import train_test_split
 import random
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 from transformers import BertTokenizer, BertForSequenceClassification
 from torch.optim import Adam
 from functools import cache
 import time
 import argparse
-import glob
+from pathlib import Path
 import logging
 from train_val import EFRTraining
+from sklearn.preprocessing import MultiLabelBinarizer
+from utils.dataset_utility import EFRDataset, generate_tensor_utterances
+from train_val import EFRClass
+import warnings
+warnings.simplefilter('ignore')
 
 # Hyper-parameters
 EPOCHS = 1
@@ -43,42 +47,21 @@ TEST_PARAMS = {'batch_size': VALID_BATCH_SIZE,
                 'num_workers': 0
                 }
 
-class EFRDataset(Dataset):
-    def __init__(self, dataframe, tokenizer, max_len):
-        self.tokenizer = tokenizer
-        self.data = dataframe
-        self.utterances = dataframe.utterances
-        self.triggers = dataframe.triggers
-        self.speakers = dataframe.speakers
-        self.max_len = max_len
-        self.len = len(self.data)
 
-    def __len__(self):
-        return self.len
-    
-    def __getitem__(self, index):
-        utterance = self.utterances[index]
-        trigger = self.triggers[index]
 
-        utt_tokenized = list(map(lambda x: self.tokenizer.encode_plus(x, add_special_tokens=True, truncation=True), utterance))     
-        #utt_encodings = self.tokenize55r.encode_plus(utterance, add_special_tokens=True, return_tensors="pt")
-        # print(utterance)
-        print("TTTTTTTTTTTTTTTTTTTTTTTTT")
-        #print(utt_tokenized) 
 
-        return {
-            'utterances_tokenized': torch.tensor(utt_tokenized[0]['input_ids'], dtype=torch.long),
-            'triggers': torch.tensor(trigger, dtype=torch.long)
-        }
+
 
 
 def readData(): 
     return pd.read_json('data/MELD_train_efr.json')
 
+
 def create_dataframes(orginal_df, seed):
     train, test_validation = train_test_split(orginal_df, test_size=0.2, random_state=seed)
     validation, test = train_test_split(test_validation, test_size=0.5, random_state=seed)
-    return train, validation, test
+    return train.reset_index(drop=True), validation.reset_index(drop=True), test.reset_index(drop=True)
+
 
 def set_default_seed(_seed):
     #_seed = SEEDS[0]
@@ -91,18 +74,71 @@ def set_default_seed(_seed):
 
     return _seed
 
+
 def set_device():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print("Using device => ", device)
 
-def prepare_data():
-    pass
+def replace_none_with_zero(lst):
+    return [0 if x is None else x for x in lst]
+
+def prepare_data(df, tokenizer):
+    # Emotions One-hot Labeling
+    df = one_hot_encoder(df, 'emotions', 'emotions_ids')
+    # Speakers One-hot Labeling
+    df = one_hot_encoder(df, 'speakers', 'speakers_ids')
+
+    # Add padding to dialog
+    max_n_dialogs = max(df['utterances'].apply(lambda x: len(x)))
+    max_n_speakers = max(df['speakers'].apply(lambda x: len(x)))
+    max_n_triggers = max(df['triggers'].apply(lambda x: len(x)))
+    max_n_emotions = max(df['emotions'].apply(lambda x: len(x)))
+    print(f"\nMaximum Number of Dialogs: {max_n_dialogs}")
+    print(f"Maximum Number of Speakers: {max_n_speakers}")
+    print(f"Maximum Number of Triggers: {max_n_triggers}")
+    print(f"Maximum Number of Emotions: {max_n_emotions}\n")
+    assert max_n_dialogs == max_n_speakers == max_n_triggers == max_n_emotions, "maximum number of features list are not equal"
+
+    # Clean Data
+    df['triggers'] = df['triggers'].apply(replace_none_with_zero)
+    
+    # Add paddings
+    df['tokenized_utterances'] = df['utterances'].apply(lambda x: generate_tensor_utterances(x, tokenizer, MAX_LEN, max_n_dialogs))
+    df['trigger_ids'] = df['triggers'].apply(lambda x: torch.tensor(x + [0] * (max_n_dialogs - len(x)), dtype=torch.long))
+
+    return df
+
+
+def one_hot_encoder(df, column_name, new_column_name):
+    mlb = MultiLabelBinarizer()
+    binary_encoded = mlb.fit_transform(df[column_name])
+
+    class_to_decimal = {label: i for i, label in enumerate(mlb.classes_)}
+    df[new_column_name] = df[column_name].apply(lambda x: [class_to_decimal[label] for label in x])
+
+    # Find the minum bits for classifying
+    max_decimal = max(max(x) for x in df[new_column_name])
+    min_bits = max(1, (max_decimal.bit_length() + 7) // 8) * 8
+    print(f"At most {min_bits} bits needed for labeling {column_name}")
+
+    df[new_column_name] = df[new_column_name].apply(lambda x: [format(decimal, f'0{min_bits}b') for decimal in x])
+    return df
+
 
 @cache
 def predefined_model():
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', truncation=True, do_lower_case=True)
     pretrained_model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
     return tokenizer, pretrained_model
+
+def save_dataframe(df):
+    folder = Path.cwd().joinpath("dataframes")
+    if not folder.exists():
+        folder.mkdir(parents=True)
+
+    df_path = Path.joinpath(folder, 'df_MELD_efr'+'.pkl')
+    df.to_pickle(df_path)
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -121,19 +157,15 @@ def main():
 
     # Retrieve pretrained model
     start = time.time()
-    tokenizer, model = predefined_model()
-    print(f"Retriving Model and Tokenizer time: {time.time()-start}")
+    tokenizer, pretrained_model = predefined_model()
+    print(f"\nTime of retriving model and tokenizer: {time.time()-start}\n")
 
     # Inspecting Data
+    start = time.time()
     _df = readData()
-    for id,row in  _df.iterrows():
-         if id == 1227:
-            print(row['utterances'])
-    #     print(len(row['utterances']))
-    max_n_dialogs = max(_df['utterances'].apply(lambda x: len(x)))
-    max_n_speakers = max(_df['speakers'].apply(lambda x: len(x)))
-    print(f"Maximum Number of Dialogs: {max_n_dialogs}")
-    print(f"Maximum Number of Speakers: {max_n_speakers}")
+    _df = prepare_data(_df, tokenizer)
+    save_dataframe(_df)
+    print(f"Time of preparing data and saving it: {time.time()-start}\n")
 
     # Setup Datasets
     df_train, df_validation, df_test = create_dataframes(_df, seed)
@@ -147,26 +179,16 @@ def main():
     # loader_test = DataLoader(dataset_test, **TEST_PARAMS)
 
     #if args.do_train:
-    # optimizer = Adam(model.parameters(), lr=LEARNING_RATE)
-    # trainer = EFRTraining(model, loader_train, optimizer, EPOCHS, device).train()
+    model = EFRClass(pretrained_model, device)
+    model.to(device)
+
+    optimizer = Adam(model.parameters(), lr=LEARNING_RATE)
+    trainer = EFRTraining(model, loader_train, optimizer, EPOCHS, device).train()
 
 
     # elif args.do_eval:
     #     # Load
 
-
-
-    
-
-    
-
-
-    print(_df['speakers'][0])
-    print(_df['utterances'][0])
-    print(_df['triggers'][0])
-    print(_df.keys())
-    print(len(_df))
-    prepare_data()
 
 
 if __name__ == "__main__":
