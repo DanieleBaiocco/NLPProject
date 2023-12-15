@@ -24,6 +24,7 @@ import logging
 from train_val import EFRTraining
 from sklearn.preprocessing import MultiLabelBinarizer
 from utils.dataset_utility import EFRDataset, generate_tensor_utterances
+from train_val import EFRClass
 import warnings
 warnings.simplefilter('ignore')
 
@@ -78,6 +79,8 @@ def set_device():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print("Using device => ", device)
 
+def replace_none_with_zero(lst):
+    return [0 if x is None else x for x in lst]
 
 def prepare_data(df, tokenizer):
     # Emotions One-hot Labeling
@@ -96,9 +99,12 @@ def prepare_data(df, tokenizer):
     print(f"Maximum Number of Emotions: {max_n_emotions}\n")
     assert max_n_dialogs == max_n_speakers == max_n_triggers == max_n_emotions, "maximum number of features list are not equal"
 
+    # Clean Data
+    df['triggers'] = df['triggers'].apply(replace_none_with_zero)
+    
     # Add paddings
     df['tokenized_utterances'] = df['utterances'].apply(lambda x: generate_tensor_utterances(x, tokenizer, MAX_LEN, max_n_dialogs))
-
+    df['trigger_ids'] = df['triggers'].apply(lambda x: torch.tensor(x + [0] * (max_n_dialogs - len(x)), dtype=torch.long))
 
     return df
 
@@ -151,7 +157,7 @@ def main():
 
     # Retrieve pretrained model
     start = time.time()
-    tokenizer, model = predefined_model()
+    tokenizer, pretrained_model = predefined_model()
     print(f"\nTime of retriving model and tokenizer: {time.time()-start}\n")
 
     # Inspecting Data
@@ -173,6 +179,9 @@ def main():
     # loader_test = DataLoader(dataset_test, **TEST_PARAMS)
 
     #if args.do_train:
+    model = EFRClass(pretrained_model, device)
+    model.to(device)
+
     optimizer = Adam(model.parameters(), lr=LEARNING_RATE)
     trainer = EFRTraining(model, loader_train, optimizer, EPOCHS, device).train()
 

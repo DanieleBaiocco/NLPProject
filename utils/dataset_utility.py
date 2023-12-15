@@ -34,7 +34,7 @@ class EFRDataset(Dataset):
         self.data = dataframe
         #self.utterances = dataframe.utterances
         self.tokenized_utterances = dataframe.tokenized_utterances
-        self.triggers = dataframe.triggers
+        self.triggers = dataframe.trigger_ids
         self.speakers = dataframe.speakers
         self.max_len = max_len
         self.len = len(self.data)
@@ -44,6 +44,7 @@ class EFRDataset(Dataset):
     
     def __getitem__(self, index):
         tokenized_utterances = self.tokenized_utterances[index]
+        triggers = self.triggers[index]
         #trigger = self.triggers[index]
         #utt_tokenized = list(map(lambda x: self.tokenizer.encode_plus(x, add_special_tokens=True, truncation=True, max_length=self.max_len, pad_to_max_length=True), utterance))
                             
@@ -53,6 +54,6 @@ class EFRDataset(Dataset):
         #print(utt_tokenized) 
 
         return {
-            'utterances': tokenized_utterances                      # Dict k:(input_ids, attention_mask)  tensor
-            #'triggers': torch.tensor(trigger, dtype=torch.long)
+            'utterances': tokenized_utterances,                      # Dict k:(input_ids, attention_mask)  tensor
+            'triggers': triggers    # List tensor
         }
