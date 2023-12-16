@@ -21,10 +21,13 @@ import time
 import argparse
 from pathlib import Path
 import logging
+import copy
+import pickle
 from train_val import EFRTraining
 from sklearn.preprocessing import MultiLabelBinarizer
 from utils.dataset_utility import EFRDataset, generate_tensor_utterances
-from train_val import EFRClass
+from utils.models import EFRClass
+from utils.models import save_model, load_model
 import warnings
 warnings.simplefilter('ignore')
 
@@ -101,9 +104,9 @@ def prepare_data(df, tokenizer):
 
     # Clean Data
     df['triggers'] = df['triggers'].apply(replace_none_with_zero)
-    
+
     # Add paddings
-    df['tokenized_utterances'] = df['utterances'].apply(lambda x: generate_tensor_utterances(x, tokenizer, MAX_LEN, max_n_dialogs))
+    df[['utterances_input_ids','utternaces_attention_mask']] = df['utterances'].apply(lambda x: pd.Series(generate_tensor_utterances(x, tokenizer, MAX_LEN, max_n_dialogs),index = ['utterances_input_ids','utternaces_attention_mask']))
     df['trigger_ids'] = df['triggers'].apply(lambda x: torch.tensor(x + [0] * (max_n_dialogs - len(x)), dtype=torch.long))
 
     return df
@@ -132,62 +135,84 @@ def predefined_model():
     return tokenizer, pretrained_model
 
 def save_dataframe(df):
-    folder = Path.cwd().joinpath("dataframes")
-    if not folder.exists():
-        folder.mkdir(parents=True)
+    _folder = Path.cwd().joinpath("dataframes")
+    if not _folder.exists():
+        _folder.mkdir(parents=True)
 
-    df_path = Path.joinpath(folder, 'df_MELD_efr'+'.pkl')
+    df_path = Path.joinpath(_folder, 'df_MELD_efr'+'.pkl')
     df.to_pickle(df_path)
+
+
+def load_dataframe(_folder):
+    df_path = Path.joinpath('dataframes/df_MELD_efr'+'.pkl')
+    with open(df_path, 'rb') as file:
+        df = pickle.load(file)
+    return df
+
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--do_train", action="store_true", help="Whether to run training.")
     parser.add_argument("--do_eval", action="store_true", help="Whether to run eval on the dev set.")
+    parser.add_argument("--load_df", action="store_true", help="Whether to run eval on the dev set.")
     parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
     args = parser.parse_args()
 
     # Initialize the randomization
     seed = args.seed
     set_default_seed(seed)
-
-    # Set Device
     device = set_device()
     print("do train: ", args.do_train)
 
     # Retrieve pretrained model
     start = time.time()
-    tokenizer, pretrained_model = predefined_model()
-    print(f"\nTime of retriving model and tokenizer: {time.time()-start}\n")
+    tokenizer, base_model = predefined_model()
+    pre_model_frozen = copy.deepcopy(base_model)
+    pre_model_unfrozen = copy.deepcopy(base_model)
+    for param in pre_model_frozen.bert.parameters():
+        param.requires_grad = False
+    print(f"\nTime of retriving model and tokenizer: {time.time()-start:.1f}\n")
 
     # Inspecting Data
     start = time.time()
+    #if args.load_df:
+    #_df = load_dataframe()
+    #else:
     _df = readData()
     _df = prepare_data(_df, tokenizer)
     save_dataframe(_df)
-    print(f"Time of preparing data and saving it: {time.time()-start}\n")
+    print(f"Time of preparing data and saving it: {time.time()-start:.1f}\n")
 
     # Setup Datasets
     df_train, df_validation, df_test = create_dataframes(_df, seed)
     dataset_train = EFRDataset(df_train, tokenizer, MAX_LEN)
-    #dataset_validation = EFRDataset(df_validation, tokenizer, MAX_LEN)
-    #dataset_test = EFRDataset(df_test, tokenizer, MAX_LEN)
+    dataset_validation = EFRDataset(df_validation, tokenizer, MAX_LEN)
+    dataset_test = EFRDataset(df_test, tokenizer, MAX_LEN)
 
     # Setup DataLoaders
     loader_train = DataLoader(dataset_train, **TRAIN_PARAMS)
-    # loader_validation = DataLoader(dataset_validation, **TEST_PARAMS)
-    # loader_test = DataLoader(dataset_test, **TEST_PARAMS)
+    loader_validation = DataLoader(dataset_validation, **TEST_PARAMS)
+    loader_test = DataLoader(dataset_test, **TEST_PARAMS)
 
     #if args.do_train:
-    model = EFRClass(pretrained_model, device)
-    model.to(device)
+    model_frozen = EFRClass(pre_model_frozen, device)
+    model_unfrozen = EFRClass(pre_model_unfrozen, device)
+    pre_model_frozen.to(device)
+    model_unfrozen.to(device)
 
-    optimizer = Adam(model.parameters(), lr=LEARNING_RATE)
-    trainer = EFRTraining(model, loader_train, optimizer, EPOCHS, device).train()
-
+    
+    trainer = EFRTraining(loader_train, loader_validation, loader_test,  EPOCHS, device, seed, True)
+    #trainer1 = EFRTraining(model_frozen, loader_train, loader_validation, loader_test, optimizer_frozen, EPOCHS, device, seed, False)
+    optimizer_frozen = Adam(model_frozen.parameters(), lr=LEARNING_RATE)
+    optimizer_unfrozen = Adam(model_unfrozen.parameters(), lr=LEARNING_RATE)
+    trainer.train(model_unfrozen, optimizer_unfrozen)
 
     # elif args.do_eval:
-    #     # Load
+    # loaded_tokenizer, loaded_model_frozen = load_model(seed,'frozen')
+    # _, loaded_model_unfrozen = load_model(seed,'unfrozen')
+
+    # trainer.test(loaded_model_frozen)
 
 
 
