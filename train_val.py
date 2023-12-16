@@ -3,68 +3,89 @@
 # ===========================================
 
 from tqdm import tqdm
-
+from sklearn.metrics import accuracy_score
 import torch
-
+from utils.models import save_model, load_model
 
 def loss_fn(outputs, targets):
     return torch.nn.BCEWithLogitsLoss()(outputs, targets)
 
 class EFRTraining():
-    def __init__(self, model, training_loader, optimizer, epochs, device):
-        self.model = model
+    def __init__(self, training_loader, validation_loader, test_loader, device, seed=42, epochs=20, is_unfrozen=True):
         self.training_loader = training_loader
-        self.optimizer = optimizer 
-        self.EPOCHS = epochs
+        self.validation_loader = validation_loader
+        self.test_loader = test_loader
+        self.epochs = epochs
         self.device = device
+        self.seed = seed
+        self.is_unforzen = is_unfrozen
 
 
-    def train_steps(self, epoch):
+    def train_steps(self, model, optimizer, epoch):
+        model.train()
 
         total_loss = 0
         nb_tr_steps = 0
-        nb_tr_examples = 0
-        n_correct = 0
+        all_preds = []
+        all_labels = []
 
         loop = tqdm(enumerate(self.training_loader, 0), total=len(self.training_loader))
         for _,data in loop:
-            inputs = data['utterances']
-            print("000000000000000000000000000000000000000000000000")
-            #triggers = data['triggers'].to(self.device, dtype = torch.long)
-            triggers = data['triggers']
+            utterances_input_ids = data['utterances_input_ids']
+            targets = data['triggers']
+            print(f"input shape: {utterances_input_ids.shape}")
+            print(f"triggers shape: {targets.shape}")
             outputs = self.model(data)
             print("###################################")
             print(outputs)
-            print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
             self.optimizer.zero_grad()
             #loss = loss_fn(outputs, targets)
             loss = outputs.loss
-
             total_loss += loss.item()
 
             loss.backward()
-            self.optimizer.step()
+            optimizer.step()
 
-            # big_idx = outputs.cpu().detach().numpy()>=0.5
-            # n_correct += calcuate_accu(big_idx, targets)
-            # nb_tr_examples += len(targets) * len(targets[0])
+            predictions = torch.argmax(outputs.logits,dim=1)
+            all_preds.extend(predictions.cpu().numpy())
+            all_labels.extend(targets.cpu().numpy())
+
             nb_tr_steps += 1
-
-            # accu_step = (n_correct*100)/nb_tr_examples
-            average_loss = total_loss / nb_tr_steps
+            avg_loss = total_loss / nb_tr_steps
+            avg_accuracy = accuracy_score(all_labels, all_preds)
 
             loop.set_description(f'Epoch {epoch + 1}/{self.epochs}')
             #loop.set_postfix(loss_average = average_loss)
-            #loop.set_postfix({'loss':loss.item(), 'loss_average':average_loss, 'accuracy':f'{accu_step:.2f}%'})
+            loop.set_postfix({'loss':loss.item(), 'loss_average':avg_loss, 'accuracy':f'{avg_accuracy:.2f}%'})
+
+        return avg_loss
+
+
+    def validation(self, model):
+        self.model.eval()
+        nb_val_steps = 0
+        total_loss = 0
+
+        with torch.no_grad():
+            loop = tqdm(enumerate(self.validation_loader, 0), total=len(self.validation_loader))
+
+            for _, data in loop:
+                outputs = model(data)
+
+                loss = outputs.loss
+                total_loss += loss.item()
+                nb_val_steps += 1
+
+                loop.set_description(f'validation: {nb_val_steps}/{len(self.validation_loader)}')
+
+            average_loss = total_loss / nb_val_steps
 
         return average_loss
 
-    def validation():
-        pass
 
-    def train(self):
-        self.model.train()
-
+    def train(self, model, optimizer):
+        
+        
         train_losses = []
         val_losses = []
 
@@ -73,13 +94,13 @@ class EFRTraining():
         patience = 2
         trigger_count = 0
 
-        for epoch in range(self.EPOCHS):
+        for epoch in range(self.epochs):
 
-            _train_loss = self.train_steps(epoch)
+            _train_loss = self.train_steps(model, optimizer, epoch)
             train_losses.append(_train_loss)
 
-            #@_val_loss = validation(model, validation_loader)
-            #val_losses.append(_val_loss)
+            _val_loss = self.validation(model)
+            val_losses.append(_val_loss)
 
             # current_loss = _val_loss
             # if current_loss >= last_loss:
@@ -93,40 +114,33 @@ class EFRTraining():
 
             # last one or min ? difference is in the first if.
             #last_loss = current_loss
-
-    def fineTuning():
-        pass
-
-
-
-class EFRClass(torch.nn.Module):
-
-    def __init__(self, pretrained_model, device):
-        super(EFRClass, self).__init__()
-        self.l1 = pretrained_model
-        self.pre_classifier = torch.nn.Linear(768, 768)
-        self.dropout = torch.nn.Dropout(0.1)
-        self.classifier = torch.nn.Linear(768, 4)
-        self.device = device
-
-    def forward(self, data):
-        # Extract Data
-        tokenized_utterances = data['utterances']
-        current_tok_utt = tokenized_utterances[0]
         
-        input_ids = current_tok_utt['input_ids'].to(self.device, dtype = torch.long)
-        attention_mask = current_tok_utt['attention_mask'].to(self.device, dtype = torch.long)
-        current_trigger = data['triggers'][0].to(self.device, dtype = torch.long)
+        save_model(model, self.tokenizer,self.seed,"unforzen" if self.is_unforzen else "frozen")
 
 
-        #output_premise = self.l1(input_ids=premise_input_ids, attention_mask=premise_attention_mask)
-        output = self.l1(input_ids, current_trigger)
-        #output_conclusion = self.l1(input_ids=conclusion_input_ids, attention_mask=conclusion_attention_mask)
-        #hidden_state = output_premise[0] + output_conclusion[0]         #shape (N, 256, 768)
-        #hidden_state = torch.cat([hidden_state, stance_ids], dim=2)     #shape (N, 256, 769)
-       #pooler = hidden_state[:, 0]                     #shape (N, 769)
-        #pooler = self.pre_classifier(pooler)            #shape (769, 768)
-        #pooler = torch.nn.Tanh()(pooler)
-        #pooler = self.dropout(pooler)
-        #output = self.classifier(pooler)
-        return output
+    def test(self, model):
+        model.eval()
+        nb_test_steps = 0
+        all_preds = []
+        all_labels = []
+
+        with torch.no_grad():
+            loop = tqdm(enumerate(self.validation_loader, 0), total=len(self.validation_loader))
+
+            for _, data in loop:
+                outputs = self.model(data)
+                targets = data['triggers']
+
+                predictions = torch.argmax(outputs.logits,dim=1)
+                all_preds.extend(predictions.cpu().numpy())
+                all_labels.extend(targets.cpu().numpy())
+                nb_test_steps += 1
+
+                avg_accuracy = accuracy_score(all_labels, all_preds)
+                loop.set_description(f'Test: {nb_test_steps}/{len(self.validation_loader)}')
+                loop.set_postfix({'accuracy':f'{avg_accuracy:.2f}%'})
+
+        return all_preds, all_labels
+
+
+
