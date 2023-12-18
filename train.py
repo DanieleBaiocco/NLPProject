@@ -11,13 +11,13 @@ def loss_fn(outputs, targets):
     return torch.nn.BCEWithLogitsLoss()(outputs, targets)
 
 class EFRTraining():
-    def __init__(self, training_loader, validation_loader, test_loader, device, seed=42, epochs=20, is_unfrozen=True):
+    def __init__(self, training_loader, validation_loader, test_loader, device, epochs=20, seed=42, is_unfrozen=True):
         self.training_loader = training_loader
         self.validation_loader = validation_loader
         self.test_loader = test_loader
         self.epochs = epochs
         self.device = device
-        self.seed = seed
+        self.seed = seed 
         self.is_unforzen = is_unfrozen
 
 
@@ -33,12 +33,12 @@ class EFRTraining():
         for _,data in loop:
             utterances_input_ids = data['utterances_input_ids']
             targets = data['triggers']
-            print(f"input shape: {utterances_input_ids.shape}")
-            print(f"triggers shape: {targets.shape}")
-            outputs = self.model(data)
-            print("###################################")
-            print(outputs)
-            self.optimizer.zero_grad()
+            # print(f"input shape: {utterances_input_ids.shape}")
+            # print(f"triggers  shape: {targets.shape}")
+            outputs = model(data)
+            # print("###################################")
+            # print(outputs)
+            optimizer.zero_grad()
             #loss = loss_fn(outputs, targets)
             loss = outputs.loss
             total_loss += loss.item()
@@ -62,7 +62,7 @@ class EFRTraining():
 
 
     def validation(self, model):
-        self.model.eval()
+        model.eval()
         nb_val_steps = 0
         total_loss = 0
 
@@ -110,12 +110,12 @@ class EFRTraining():
             #     print(f"Early Stopping has been triggred. Epoch: {epoch+1}")
             #     break
             # else:
-            #     trigger_cou nt = 0
+            #     trigger_count = 0
 
             # last one or min ? difference is in the first if.
             #last_loss = current_loss
         
-        save_model(model, self.tokenizer,self.seed,"unforzen" if self.is_unforzen else "frozen")
+        save_model(model, self.seed, "unforzen" if self.is_unforzen else "frozen")
 
 
     def test(self, model):
@@ -140,7 +140,7 @@ class EFRTraining():
                 loop.set_description(f'Test: {nb_test_steps}/{len(self.validation_loader)}')
                 loop.set_postfix({'accuracy':f'{avg_accuracy:.2f}%'})
 
-        return all_preds, all_labels
+        return all_labels, all_preds
 
 
 

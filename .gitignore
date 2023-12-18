@@ -1,6 +1,8 @@
 .menv/
 __pycache__/
 dataframes/
+models/
+metrics/
 
 activate_run.sh
 run.sh

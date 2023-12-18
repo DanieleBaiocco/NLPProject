@@ -13,7 +13,7 @@ import os
 import pandas as pd
 from sklearn.model_selection import train_test_split
 import random
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader 
 from transformers import BertTokenizer, BertForSequenceClassification
 from torch.optim import Adam
 from functools import cache
@@ -23,11 +23,12 @@ from pathlib import Path
 import logging
 import copy
 import pickle
-from train_val import EFRTraining
+from train import EFRTraining
 from sklearn.preprocessing import MultiLabelBinarizer
 from utils.dataset_utility import EFRDataset, generate_tensor_utterances
 from utils.models import EFRClass
-from utils.models import save_model, load_model
+from utils.models import save_model, load_model, save_tokenizer
+from evaluation import evaluate
 import warnings
 warnings.simplefilter('ignore')
 
@@ -67,9 +68,9 @@ def create_dataframes(orginal_df, seed):
 
 
 def set_default_seed(_seed):
-    #_seed = SEEDS[0]
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(_seed)
+
     random.seed(_seed)
     torch.manual_seed(_seed)
     np.random.seed(_seed)
@@ -172,7 +173,7 @@ def main():
     pre_model_unfrozen = copy.deepcopy(base_model)
     for param in pre_model_frozen.bert.parameters():
         param.requires_grad = False
-    print(f"\nTime of retriving model and tokenizer: {time.time()-start:.1f}\n")
+    print(f"\nTime of retriving model and tokenizer: {time.time()-start:.1f}s\n")
 
     # Inspecting Data
     start = time.time()
@@ -182,7 +183,7 @@ def main():
     _df = readData()
     _df = prepare_data(_df, tokenizer)
     save_dataframe(_df)
-    print(f"Time of preparing data and saving it: {time.time()-start:.1f}\n")
+    print(f"Time of preparing data and saving it: {time.time()-start:.1f}s\n")
 
     # Setup Datasets
     df_train, df_validation, df_test = create_dataframes(_df, seed)
@@ -202,8 +203,9 @@ def main():
     model_unfrozen.to(device)
 
     
-    trainer = EFRTraining(loader_train, loader_validation, loader_test,  EPOCHS, device, seed, True)
+    trainer = EFRTraining(loader_train, loader_validation, loader_test, device, EPOCHS, seed, True)
     #trainer1 = EFRTraining(model_frozen, loader_train, loader_validation, loader_test, optimizer_frozen, EPOCHS, device, seed, False)
+    save_tokenizer(tokenizer, seed)
     optimizer_frozen = Adam(model_frozen.parameters(), lr=LEARNING_RATE)
     optimizer_unfrozen = Adam(model_unfrozen.parameters(), lr=LEARNING_RATE)
     trainer.train(model_unfrozen, optimizer_unfrozen)
@@ -213,6 +215,11 @@ def main():
     # _, loaded_model_unfrozen = load_model(seed,'unfrozen')
 
     # trainer.test(loaded_model_frozen)
+    # evaluation - metrics - 10 models - create pd for them 
+
+    #evaluate(trainer)
+
+    
 
 
 

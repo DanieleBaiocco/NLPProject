@@ -31,16 +31,27 @@ class EFRClass(torch.nn.Module):
         return output
     
 
-def save_model(model, tokenizer, seed, postfix):
+def save_model(model, seed, postfix):
     folder = Path.cwd().joinpath(f"models/{str(seed)}")
     if not folder.exists():
         folder.mkdir(parents=True)
 
-    model.save_pretrained(f'emotion_model_'+postfix)
-    tokenizer.save_pretrained(f'emotion_tokenizer_'+postfix)
+    _path =f'models/{str(seed)}/emotion_model_{postfix}'
+    torch.save(model, _path)
+
+
+def save_tokenizer(tokenizer, seed):
+    folder = Path.cwd().joinpath(f"models/{str(seed)}")
+    if not folder.exists():
+        folder.mkdir(parents=True)
+
+    _path = f'models/{str(seed)}/emotion_tokenizer'
+    tokenizer.save_vocabulary(_path)
+
 
 def load_model(seed, postfix):
-    model = BertForSequenceClassification.from_pretrained(f'models/{str(seed)}/emotion_model_{postfix}')
-    tokenizer = BertTokenizer.from_pretrained(f'models/{str(seed)}/emotion_model_{postfix}') 
+    return torch.load(f'models/{str(seed)}/emotion_model_{postfix}')
 
-    return tokenizer, model
+
+def load_tokenizer(seed):  
+    return BertTokenizer.from_pretrained(f'models/{str(seed)}/emotion_tokenizer') 
