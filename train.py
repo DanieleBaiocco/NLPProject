@@ -11,7 +11,7 @@ def loss_fn(outputs, targets):
     return torch.nn.BCEWithLogitsLoss()(outputs, targets)
 
 class EFRTraining():
-    def __init__(self, training_loader, validation_loader, test_loader, device, epochs=20, seed=42, is_unfrozen=True):
+    def __init__(self, training_loader, validation_loader, test_loader, device, epochs=20, seed=42):
         self.training_loader = training_loader
         self.validation_loader = validation_loader
         self.test_loader = test_loader
@@ -83,7 +83,7 @@ class EFRTraining():
         return average_loss
 
 
-    def train(self, model, optimizer):
+    def train(self, model, optimizer, is_unfrozen=True):
         
         
         train_losses = []
@@ -115,7 +115,7 @@ class EFRTraining():
             # last one or min ? difference is in the first if.
             #last_loss = current_loss
         
-        save_model(model, self.seed, "unforzen" if self.is_unforzen else "frozen")
+        save_model(model, self.seed, "unforzen" if is_unfrozen else "frozen")
 
 
     def test(self, model):

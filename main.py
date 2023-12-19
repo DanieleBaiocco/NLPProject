@@ -196,7 +196,7 @@ def main():
     loader_validation = DataLoader(dataset_validation, **TEST_PARAMS)
     loader_test = DataLoader(dataset_test, **TEST_PARAMS)
 
-    trainer = EFRTraining(loader_train, loader_validation, loader_test, device, EPOCHS, seed, True)
+    trainer = EFRTraining(loader_train, loader_validation, loader_test, device, EPOCHS, seed)
 
     if args.do_train:
         model_frozen = EFRClass(pre_model_frozen, device)
@@ -208,8 +208,9 @@ def main():
         optimizer_unfrozen = Adam(model_unfrozen.parameters(), lr=LEARNING_RATE)
 
         # Train and Save the model
-        trainer.train(model_unfrozen, optimizer_unfrozen)
-        trainer.train(model_frozen, optimizer_frozen)
+        trainer.train(model_unfrozen, optimizer_unfrozen, is_unfrozen=True)
+        print("Start Frozen Mode Training ...")
+        trainer.train(model_frozen, optimizer_frozen, is_unfrozen=False)
         save_tokenizer(tokenizer, seed)
     
     elif args.do_eval:
