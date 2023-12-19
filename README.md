@@ -5,4 +5,5 @@
 python main.py --do_train --seed=42
 
 - For evaluation and save metrics and show table
-```bash python main.py --do_eval --seed=42
+```bash
+python main.py --do_eval --seed=42
