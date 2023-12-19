@@ -2,6 +2,7 @@ from utils.models import save_model, load_model, save_tokenizer
 from sklearn.metrics import f1_score, classification_report, accuracy_score
 from pathlib import Path
 import pickle
+import pandas as pd
 
 SEEDS = [42, 123, 432, 817, 1432]
 
@@ -19,14 +20,28 @@ def evaluate(tester):
         print(f"Testing Model: {_model}")
         targets, final_outputs = tester.test()
 
-        metrics[f'model'+'_f1_score'] = f1_score(targets, final_outputs, average=None)
-        metrics[f'model'+'_macro'] = f1_score(targets, final_outputs, average='macro')
-        metrics[f'model'+'_accuracy'] = accuracy_score(targets, final_outputs)
-        metrics[f'model'+'_report'] = classification_report(targets, final_outputs)
+        metrics[f'{_model}_f1_score'] = f1_score(targets, final_outputs, average=None)
+        metrics[f'{_model}_macro'] = f1_score(targets, final_outputs, average='macro')
+        metrics[f'{_model}_accuracy'] = accuracy_score(targets, final_outputs)
+        metrics[f'{_model}_report'] = classification_report(targets, final_outputs)
 
-        print(metrics[f'model'+'_report'] )
+        print(metrics[f'{_model}_report'] )
 
-    save_metrics(metrics)   
+    save_metrics(metrics)  
+
+    # Presenting Table
+    _df = pd.DataFrame()
+    # Build columns 
+    other_cols = ['f1_score', 'macro avergage', 'accuracy']
+    _df['model']  = list(models.keys())
+    for model in models:
+        _df.loc[_df['model'] == model, other_cols] = metrics[f'{model}_f1_scor'], metrics[f'model'+'_macro'], metrics[f'{model}_accuracy']
+
+    print(_df)
+
+    
+
+
 
 
 def save_metrics(metrics):

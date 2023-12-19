@@ -27,7 +27,7 @@ from train import EFRTraining
 from sklearn.preprocessing import MultiLabelBinarizer
 from utils.dataset_utility import EFRDataset, generate_tensor_utterances
 from utils.models import EFRClass
-from utils.models import save_model, load_model, save_tokenizer
+from utils.models import save_model, load_model, save_tokenizer, load_tokenizer
 from evaluation import evaluate
 import warnings
 warnings.simplefilter('ignore')
@@ -196,28 +196,28 @@ def main():
     loader_validation = DataLoader(dataset_validation, **TEST_PARAMS)
     loader_test = DataLoader(dataset_test, **TEST_PARAMS)
 
-    #if args.do_train:
-    model_frozen = EFRClass(pre_model_frozen, device)
-    model_unfrozen = EFRClass(pre_model_unfrozen, device)
-    pre_model_frozen.to(device)
-    model_unfrozen.to(device)
-
-    
     trainer = EFRTraining(loader_train, loader_validation, loader_test, device, EPOCHS, seed, True)
-    #trainer1 = EFRTraining(model_frozen, loader_train, loader_validation, loader_test, optimizer_frozen, EPOCHS, device, seed, False)
-    save_tokenizer(tokenizer, seed)
-    optimizer_frozen = Adam(model_frozen.parameters(), lr=LEARNING_RATE)
-    optimizer_unfrozen = Adam(model_unfrozen.parameters(), lr=LEARNING_RATE)
-    trainer.train(model_unfrozen, optimizer_unfrozen)
 
-    # elif args.do_eval:
-    # loaded_tokenizer, loaded_model_frozen = load_model(seed,'frozen')
-    # _, loaded_model_unfrozen = load_model(seed,'unfrozen')
+    if args.do_train:
+        model_frozen = EFRClass(pre_model_frozen, device)
+        model_unfrozen = EFRClass(pre_model_unfrozen, device)
+        pre_model_frozen.to(device)
+        model_unfrozen.to(device)
 
-    # trainer.test(loaded_model_frozen)
-    # evaluation - metrics - 10 models - create pd for them 
+        optimizer_frozen = Adam(model_frozen.parameters(), lr=LEARNING_RATE)
+        optimizer_unfrozen = Adam(model_unfrozen.parameters(), lr=LEARNING_RATE)
 
-    #evaluate(trainer)
+        # Train and Save the model
+        trainer.train(model_unfrozen, optimizer_unfrozen)
+        trainer.train(model_frozen, optimizer_frozen)
+        save_tokenizer(tokenizer, seed)
+    
+    elif args.do_eval:
+        # Evaluate ALL models and Save the metrics, together with showing table
+        evaluate(trainer)
+
+    else:
+        print("do_train and do_eval not specified!")
 
     
 
