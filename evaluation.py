@@ -4,7 +4,8 @@ from pathlib import Path
 import pickle
 import pandas as pd
 
-SEEDS = [42, 123, 432, 817, 1432]
+#SEEDS = [42, 123, 432, 817, 1432]
+SEEDS = [42]
 
 def evaluate(tester):
 
@@ -16,16 +17,16 @@ def evaluate(tester):
 
 
     metrics = {}
-    for _model in models:
-        print(f"Testing Model: {_model}")
-        targets, final_outputs = tester.test()
+    for _m_name, _m in models.items():
+        print(f"Testing Model: {_m_name}")
+        targets, final_outputs = tester.test(_m)
 
-        metrics[f'{_model}_f1_score'] = f1_score(targets, final_outputs, average=None)
-        metrics[f'{_model}_macro'] = f1_score(targets, final_outputs, average='macro')
-        metrics[f'{_model}_accuracy'] = accuracy_score(targets, final_outputs)
-        metrics[f'{_model}_report'] = classification_report(targets, final_outputs)
+        metrics[f'{_m_name}_f1_score'] = f1_score(targets, final_outputs, average=None)
+        metrics[f'{_m_name}_macro'] = f1_score(targets, final_outputs, average='macro')
+        metrics[f'{_m_name}_accuracy'] = accuracy_score(targets, final_outputs)
+        metrics[f'{_m_name}_report'] = classification_report(targets, final_outputs)
 
-        print(metrics[f'{_model}_report'] )
+        print(metrics[f'{_m_name}_report'] )
 
     save_metrics(metrics)  
 
@@ -34,8 +35,9 @@ def evaluate(tester):
     # Build columns 
     other_cols = ['f1_score', 'macro avergage', 'accuracy']
     _df['model']  = list(models.keys())
-    for model in models:
-        _df.loc[_df['model'] == model, other_cols] = metrics[f'{model}_f1_scor'], metrics[f'model'+'_macro'], metrics[f'{model}_accuracy']
+
+    for k, _ in models.items():
+       _df.loc[_df['model'] == k, other_cols] = [metrics[f'{k}_f1_score'][0], metrics[f'{k}_macro'], metrics[f'{k}_accuracy']]
 
     print(_df)
 
@@ -49,7 +51,7 @@ def save_metrics(metrics):
     if not folder_metrics.exists():
         folder_metrics.mkdir(parents=True)
 
-    with open(f'emotion_metrics.pkl', 'wb') as file:
+    with open(f'metrics/emotion_metrics.pkl', 'wb') as file:
         pickle.dump(metrics, file)
 
 

@@ -144,8 +144,12 @@ def save_dataframe(df):
     df.to_pickle(df_path)
 
 
-def load_dataframe(_folder):
-    df_path = Path.joinpath('dataframes/df_MELD_efr'+'.pkl')
+def load_dataframe():
+    
+    df_path = 'dataframes/df_MELD_efr.pkl'
+    if not os.path.exists(df_path):
+        raise FileNotFoundError("{0} dataframe does not exist!".format(df_path))
+
     with open(df_path, 'rb') as file:
         df = pickle.load(file)
     return df
@@ -177,12 +181,12 @@ def main():
 
     # Inspecting Data
     start = time.time()
-    #if args.load_df:
-    #_df = load_dataframe()
-    #else:
-    _df = readData()
-    _df = prepare_data(_df, tokenizer)
-    save_dataframe(_df)
+    if args.load_df:
+        _df = load_dataframe()
+    else:
+        _df = readData()
+        _df = prepare_data(_df, tokenizer)
+        save_dataframe(_df)
     print(f"Time of preparing data and saving it: {time.time()-start:.1f}s\n")
 
     # Setup Datasets
