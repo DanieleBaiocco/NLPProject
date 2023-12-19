@@ -43,9 +43,6 @@ def evaluate(tester):
 
     
 
-
-
-
 def save_metrics(metrics):
     folder_metrics = Path.cwd().joinpath(f"metrics")
     if not folder_metrics.exists():
