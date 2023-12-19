@@ -27,7 +27,7 @@ from train import EFRTraining
 from sklearn.preprocessing import MultiLabelBinarizer
 from utils.dataset_utility import EFRDataset, generate_tensor_utterances
 from utils.models import EFRClass
-from utils.models import save_model, load_model, save_tokenizer
+from utils.models import save_model, load_model, save_tokenizer, load_tokenizer
 from evaluation import evaluate
 import warnings
 warnings.simplefilter('ignore')
@@ -144,8 +144,12 @@ def save_dataframe(df):
     df.to_pickle(df_path)
 
 
-def load_dataframe(_folder):
-    df_path = Path.joinpath('dataframes/df_MELD_efr'+'.pkl')
+def load_dataframe():
+    
+    df_path = 'dataframes/df_MELD_efr.pkl'
+    if not os.path.exists(df_path):
+        raise FileNotFoundError("{0} dataframe does not exist!".format(df_path))
+
     with open(df_path, 'rb') as file:
         df = pickle.load(file)
     return df
@@ -177,12 +181,12 @@ def main():
 
     # Inspecting Data
     start = time.time()
-    #if args.load_df:
-    #_df = load_dataframe()
-    #else:
-    _df = readData()
-    _df = prepare_data(_df, tokenizer)
-    save_dataframe(_df)
+    if args.load_df:
+        _df = load_dataframe()
+    else:
+        _df = readData()
+        _df = prepare_data(_df, tokenizer)
+        save_dataframe(_df)
     print(f"Time of preparing data and saving it: {time.time()-start:.1f}s\n")
 
     # Setup Datasets
@@ -196,28 +200,29 @@ def main():
     loader_validation = DataLoader(dataset_validation, **TEST_PARAMS)
     loader_test = DataLoader(dataset_test, **TEST_PARAMS)
 
-    #if args.do_train:
-    model_frozen = EFRClass(pre_model_frozen, device)
-    model_unfrozen = EFRClass(pre_model_unfrozen, device)
-    pre_model_frozen.to(device)
-    model_unfrozen.to(device)
+    trainer = EFRTraining(loader_train, loader_validation, loader_test, device, EPOCHS, seed)
 
+    if args.do_train:
+        model_frozen = EFRClass(pre_model_frozen, device)
+        model_unfrozen = EFRClass(pre_model_unfrozen, device)
+        pre_model_frozen.to(device)
+        model_unfrozen.to(device)
+
+        optimizer_frozen = Adam(model_frozen.parameters(), lr=LEARNING_RATE)
+        optimizer_unfrozen = Adam(model_unfrozen.parameters(), lr=LEARNING_RATE)
+
+        # Train and Save the model
+        trainer.train(model_unfrozen, optimizer_unfrozen, is_unfrozen=True)
+        print("Start Frozen Mode Training ...")
+        trainer.train(model_frozen, optimizer_frozen, is_unfrozen=False)
+        save_tokenizer(tokenizer, seed)
     
-    trainer = EFRTraining(loader_train, loader_validation, loader_test, device, EPOCHS, seed, True)
-    #trainer1 = EFRTraining(model_frozen, loader_train, loader_validation, loader_test, optimizer_frozen, EPOCHS, device, seed, False)
-    save_tokenizer(tokenizer, seed)
-    optimizer_frozen = Adam(model_frozen.parameters(), lr=LEARNING_RATE)
-    optimizer_unfrozen = Adam(model_unfrozen.parameters(), lr=LEARNING_RATE)
-    trainer.train(model_unfrozen, optimizer_unfrozen)
+    elif args.do_eval:
+        # Evaluate ALL models and Save the metrics, together with showing table
+        evaluate(trainer)
 
-    # elif args.do_eval:
-    # loaded_tokenizer, loaded_model_frozen = load_model(seed,'frozen')
-    # _, loaded_model_unfrozen = load_model(seed,'unfrozen')
-
-    # trainer.test(loaded_model_frozen)
-    # evaluation - metrics - 10 models - create pd for them 
-
-    #evaluate(trainer)
+    else:
+        print("do_train and do_eval not specified!")
 
     
 
