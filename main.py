@@ -38,7 +38,7 @@ SEEDS = [42, 123, 456, 843, 1296]
 TRAIN_BATCH_SIZE = 8
 VALID_BATCH_SIZE = 8
 LEARNING_RATE = 1e-05
-MAX_LEN = 100
+MAX_LEN = 256
 
 # DataLoader Hyper-paramaters
 TRAIN_PARAMS = {'batch_size': TRAIN_BATCH_SIZE,
@@ -106,9 +106,12 @@ def prepare_data(df, tokenizer):
     # Clean Data
     df['triggers'] = df['triggers'].apply(replace_none_with_zero)
 
-    # Add paddings
+    
+    # For each dialog add paddings
     df[['utterances_input_ids','utternaces_attention_mask']] = df['utterances'].apply(lambda x: pd.Series(generate_tensor_utterances(x, tokenizer, MAX_LEN, max_n_dialogs),index = ['utterances_input_ids','utternaces_attention_mask']))
     df['trigger_ids'] = df['triggers'].apply(lambda x: torch.tensor(x + [0] * (max_n_dialogs - len(x)), dtype=torch.long))
+
+    # Concatenate all dialogs with seperator
 
     return df
 
@@ -132,7 +135,7 @@ def one_hot_encoder(df, column_name, new_column_name):
 @cache
 def predefined_model():
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', truncation=True, do_lower_case=True)
-    pretrained_model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
+    pretrained_model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=4)
     return tokenizer, pretrained_model
 
 def save_dataframe(df):

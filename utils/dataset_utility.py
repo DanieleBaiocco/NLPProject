@@ -21,8 +21,8 @@ def generate_tensor_utterances(utterance, tokenizer, max_len, max_n_dialogs):
     attention_mask  = add_padding(attention_mask, _n_pad, max_len)
     return input_ids, attention_mask
 
-
-class EFRDataset(Dataset):
+# First solution to get dialogs seprately
+class EFRDataset_1(Dataset):
     def __init__(self, dataframe, tokenizer, max_len):
         self.tokenizer = tokenizer
         self.data = dataframe
@@ -46,4 +46,33 @@ class EFRDataset(Dataset):
             'utterances_input_ids': torch.tensor(utterances_input_ids[0], dtype=torch.long),           # Dict k:(input_ids, attention_mask) 
             'utternaces_attention_mask': torch.tensor(utternaces_attention_mask[0],dtype=torch.long),  # Dict k:(input_ids, attention_mask)  
             'triggers': _triggers[0]                                                                   # List 
+        }
+    
+
+# Combine all dialogs without speaker
+class EFRDataset(Dataset):
+    def __init__(self, dataframe, tokenizer, max_len):
+        self.tokenizer = tokenizer
+        self.data = dataframe
+        self.utterances = dataframe.utterances
+        self.triggers = dataframe.trigger_ids
+        self.speakers = dataframe.speakers
+        self.max_len = max_len
+        self.len = len(self.data)
+
+    def __len__(self):
+        return self.len
+    
+    def __getitem__(self, index):
+        utterances = self.utterances[index]
+        _triggers = self.triggers[index]
+
+        concatenated_utterance = "[SEP]".join(utterances)
+
+        encodings = self.tokenizer.encode_plus(concatenated_utterance, add_special_tokens=True, truncation=True, max_length=self.max_len, padding='max_length')
+
+        return {
+            'utterances_input_ids': torch.tensor(encodings['input_ids'], dtype=torch.long),           
+            'utternaces_attention_mask': torch.tensor(encodings['attention_mask'],dtype=torch.long),   
+            'triggers': _triggers[0]       # List(size=24) tensor 
         }

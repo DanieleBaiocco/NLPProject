@@ -31,22 +31,16 @@ class EFRTraining():
 
         loop = tqdm(enumerate(self.training_loader, 0), total=len(self.training_loader))
         for _,data in loop:
-            utterances_input_ids = data['utterances_input_ids']
             targets = data['triggers']
-            # print(f"input shape: {utterances_input_ids.shape}")
-            # print(f"triggers  shape: {targets.shape}")
             outputs = model(data)
-            # print("###################################")
-            # print(outputs)
             optimizer.zero_grad()
-            #loss = loss_fn(outputs, targets)
             loss = outputs.loss
             total_loss += loss.item()
 
             loss.backward()
             optimizer.step()
 
-            predictions = torch.argmax(outputs.logits,dim=1)
+            predictions = torch.argmax(outputs.logits, dim=1)
             all_preds.extend(predictions.cpu().numpy())
             all_labels.extend(targets.cpu().numpy())
 
@@ -55,7 +49,6 @@ class EFRTraining():
             avg_accuracy = accuracy_score(all_labels, all_preds)
 
             loop.set_description(f'Epoch {epoch + 1}/{self.epochs}')
-            #loop.set_postfix(loss_average = average_loss)
             loop.set_postfix({'loss':loss.item(), 'loss_average':avg_loss, 'accuracy':f'{avg_accuracy:.2f}%'})
 
         return avg_loss
