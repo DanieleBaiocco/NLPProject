@@ -1,3 +1,6 @@
 # Emotion Discovery and Reasoning its Flip in Conversation
 
-python main.py --do_train --seed=42
+- For training and save models (Frozen and Unfrozen)
+''' python main.py --do_train --seed=42
+- For evaluation and save metrics and show table
+''' python main.py --do_eval --seed=42
